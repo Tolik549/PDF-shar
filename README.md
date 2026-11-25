@@ -45,6 +45,12 @@ Windows-ПК (10/11) в любую папку и запустите **`PDF-shar.
 встроены, отдельная установка не нужна. В папке рядом с exe всегда должны лежать
 нативные библиотеки: `pdfium.dll` и `x64/tesseract50.dll` (они идут в комплекте).
 
+> **Visual C++ Runtime в комплекте.** `tesseract50.dll` требует MSVCP/VCRUNTIME
+> (`msvcp140.dll`, `vcruntime140.dll`, `vcruntime140_1.dll` и др.). Они вкладываются
+> скриптом из `runtime/vcrt/` в корень и в `x64/`, поэтому OCR работает на ПК даже
+> без установленного «Microsoft Visual C++ 2015–2022 Redistributable». Источник DLL —
+> официальный `vc_redist.x64.exe`.
+
 > Сборка возможна и из-под Linux (кросс-компиляция задаётся через
 > `EnableWindowsTargeting` в `PDF-shar.csproj`), но приложение рассчитано на запуск
 > только в Windows.
