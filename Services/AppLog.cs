@@ -44,6 +44,22 @@ public static class AppLog
         Append($"[INFO] {message}");
     }
 
+    /// <summary>
+    /// Пишет блок журнала распознавания (многострочный). Используется для
+    /// накопления данных об OCR/анализе, чтобы улучшать алгоритмы.
+    /// </summary>
+    public static void Recognition(string documentName, string details)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"[REC] документ: {documentName}");
+        _ = details.Trim('\n', '\r');
+        foreach (string line in details.Split('\n'))
+        {
+            sb.Append("[REC]   ").Append(line.TrimEnd('\r')).AppendLine();
+        }
+        Append(sb.ToString());
+    }
+
     public static void Error(string context, Exception ex)
     {
         var sb = new StringBuilder();

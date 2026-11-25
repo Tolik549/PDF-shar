@@ -106,6 +106,7 @@ public sealed class FolderDocumentProcessor : IDisposable
             }
 
             // 2. Если текста нет — это скан, подключаем OCR.
+            bool usedOcr = false;
             if (string.IsNullOrWhiteSpace(text))
             {
                 if (!_ocr.HasLanguageData)
@@ -118,6 +119,7 @@ public sealed class FolderDocumentProcessor : IDisposable
                 }
 
                 text = _ocr.OcrPdf(path);
+                usedOcr = true;
             }
 
             if (string.IsNullOrWhiteSpace(text))
@@ -132,6 +134,9 @@ public sealed class FolderDocumentProcessor : IDisposable
             doc.Theme = analysis.Theme;
             doc.Summary = analysis.Summary;
             doc.Status = DocumentStatus.Ready;
+
+            // 4. Пишем журнал распознавания для последующего улучшения алгоритмов.
+            LogRecognition(doc, text, analysis, usedOcr);
         }
         catch (Exception ex)
         {
@@ -152,6 +157,24 @@ public sealed class FolderDocumentProcessor : IDisposable
             parts.Add(e.Message);
         }
         return string.Join(" | ", parts);
+    }
+
+    /// <summary>
+    /// Пишет в журнал параметры распознавания для анализа и улучшения алгоритмов.
+    /// </summary>
+    private static void LogRecognition(DocumentInfo doc, string text, TextAnalysisResult analysis, bool usedOcr)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("источник=").Append(usedOcr ? "OCR" : "text-layer").AppendLine();
+        sb.Append("язык=").Append(analysis.Language).AppendLine();
+        sb.Append("len=").Append(text.Length).AppendLine();
+        sb.Append("тема=").Append(analysis.Theme).AppendLine();
+        sb.Append("слова=");
+        sb.Append(string.Join("; ", analysis.TopKeywords.Select(k => $"{k.Word}({k.Count}, {k.Score:0.00})")));
+        sb.AppendLine();
+        sb.Append("содержание=").Append(analysis.Summary).AppendLine();
+        sb.Append("текст(0..400)=").Append(text.Length > 400 ? text[..400] : text).AppendLine();
+        AppLog.Recognition(doc.FileName, sb.ToString());
     }
 
     public void Dispose()
