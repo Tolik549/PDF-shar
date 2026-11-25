@@ -63,6 +63,13 @@ public sealed class SimpleTextAnalyzer : IThemeAnalyzer
         "основании", "согласно", "соответствии", "средств", "средств", "помощью",
         "путем", "путем", "необходимо", "необходимость", "различных", "различные",
         "следующих", "следующее",
+        // ---- Служебные/табличные и реквизитные слова — шум для «темы» ----
+        "отлично", "допустимо", "наименование", "обозначение", "должность", "диспетчерское",
+        "параллельное", "смещение", "несоосность", "скорость", "вращения", "угловая",
+        "таблица", "приложение", "марка", "прибора", "положение", "механизмов", "отчет",
+        "отчета", "служебная", "записка", "уважаемый", "ответственностью", "ограниченной",
+        "общество", "ооо", "расшифровка", "подписи", "исполнил", "составил",
+        "мин", "об", "мм", "курганская", "тэц",
         // ---- Английские стоп-слова ----
         "a", "an", "and", "the", "of", "to", "in", "for", "on", "is", "are", "was",
         "were", "be", "being", "been", "it", "its", "this", "that", "these", "those",
@@ -87,6 +94,8 @@ public sealed class SimpleTextAnalyzer : IThemeAnalyzer
             return new TextAnalysisResult(string.Empty, string.Empty, "unknown", Array.Empty<KeywordHit>());
         }
 
+        // Подготовка: убираем типографские апострофы/кавычки OCR и лишние пробелы.
+        text = NormalizeText(text);
         string language = DetectLanguage(text);
 
         // 1. Частотность значимых слов.
@@ -100,21 +109,26 @@ public sealed class SimpleTextAnalyzer : IThemeAnalyzer
             freq[w] = freq.TryGetValue(w, out int c) ? c + 1 : 1;
         }
 
-        var topKeywords = freq
+        var ranked = freq
             .Select(kv => new KeywordHit(kv.Key, kv.Value, Score(kv.Key, kv.Value)))
             .OrderByDescending(k => k.Score)
             .ThenBy(k => k.Word, StringComparer.OrdinalIgnoreCase)
-            .Take(8)
             .ToList();
 
-        if (topKeywords.Count == 0)
+        if (ranked.Count == 0)
         {
             return new TextAnalysisResult(string.Empty, string.Empty, language, Array.Empty<KeywordHit>());
         }
 
+        var topKeywords = ranked.Take(8).ToList();
+        string theme = BuildTheme(ranked);
+        var themeWords = theme.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(w => w.ToLowerInvariant())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         var kwSet = topKeywords.Select(k => k.Word).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        string theme = BuildTheme(topKeywords);
-        string summary = BuildSummary(text, kwSet);
+        kwSet.UnionWith(themeWords);
+        string summary = BuildSummary(text, kwSet, themeWords.FirstOrDefault() ?? topKeywords[0].Word);
 
         return new TextAnalysisResult(theme, summary, language, topKeywords);
     }
@@ -136,13 +150,29 @@ public sealed class SimpleTextAnalyzer : IThemeAnalyzer
     /// <summary>Тема документа — топ ключевых слов (с большой буквы).</summary>
     private static string BuildTheme(IReadOnlyList<KeywordHit> top)
     {
-        int n = Math.Min(top.Count, MaxThemeWords);
-        var parts = new List<string>(n);
-        for (int i = 0; i < n; i++)
+        var parts = new List<string>();
+        var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kw in top)
         {
-            parts.Add(Capitalize(top[i].Word));
+            if (parts.Count >= MaxThemeWords)
+            {
+                break;
+            }
+            // Пропускаем «формы» уже выбранного слова (общий корень).
+            string root = Root(kw.Word);
+            if (roots.Add(root))
+            {
+                parts.Add(kw.Word);
+            }
         }
-        return string.Join(" ", parts);
+        return string.Join(" ", parts.Select(Capitalize));
+    }
+
+    /// <summary>Короткий корень слова (первые до 5 букв в нижнем регистре) для дедупликации форм.</summary>
+    private static string Root(string word)
+    {
+        int n = Math.Min(5, word.Length);
+        return word[..n].ToLowerInvariant();
     }
 /// <summary>Токенизация: слова из букв (кириллица/латиница), приводятся к нижнему регистру.</summary>
     private static IEnumerable<string> Tokenize(string text)
@@ -166,6 +196,75 @@ public sealed class SimpleTextAnalyzer : IThemeAnalyzer
             result.Add(cur.ToString());
         }
         return result;
+    }
+
+    /// <summary>
+    /// Подготовка текста OCR к анализу: заменяем типографские апострофы/кавычки
+    /// на пробел, сжимаем повторные пробелы. Переносы строк сохраняются (границы
+    /// строк важны для разделения на предложения и выявления строк таблиц).
+    /// </summary>
+    private static string NormalizeText(string text)
+    {
+        var norm = new StringBuilder(text.Length);
+        foreach (char ch in text)
+        {
+            if (ch == '\u2018' || ch == '\u2019' || ch == '\u201B' ||
+                ch == '\u201C' || ch == '\u201D' || ch == '`' || ch == '\'')
+            {
+                norm.Append(' ');
+            }
+            else if (char.IsControl(ch) && ch != '\n' && ch != '\r' && ch != '\t')
+            {
+                norm.Append(' ');
+            }
+            else
+            {
+                norm.Append(ch);
+            }
+        }
+        return CollapseSpaces(norm.ToString());
+    }
+
+    private static string CollapseSpaces(string s)
+    {
+        var sb = new StringBuilder(s.Length);
+        bool inSpace = false;
+        foreach (char c in s)
+        {
+            if (c == ' ' || c == '\t')
+            {
+                if (inSpace)
+                {
+                    continue;
+                }
+                inSpace = true;
+                sb.Append(c == '\t' ? ' ' : c);
+            }
+            else
+            {
+                inSpace = false;
+                sb.Append(c);
+            }
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Строка похожа на данные таблицы: большая доля цифр/разделителей.</summary>
+    private static bool IsTableLike(string s)
+    {
+        int digits = 0, letters = 0;
+        foreach (char c in s)
+        {
+            if (char.IsDigit(c))
+            {
+                digits++;
+            }
+            else if (char.IsLetter(c))
+            {
+                letters++;
+            }
+        }
+        return letters + digits > 0 && digits / (double)(letters + 1) >= 0.5;
     }
 
     private static bool IsWordChar(char ch)
@@ -194,7 +293,7 @@ public sealed class SimpleTextAnalyzer : IThemeAnalyzer
     }
 
     /// <summary>Extractive-краткое содержание: до 3 предложений, MMR-выбор без дублей.</summary>
-    private static string BuildSummary(string text, IReadOnlyCollection<string> kwSet)
+    private static string BuildSummary(string text, IReadOnlyCollection<string> kwSet, string leadWord)
     {
         var sentences = SplitSentences(text);
         if (sentences.Count == 0)
@@ -206,7 +305,7 @@ public sealed class SimpleTextAnalyzer : IThemeAnalyzer
         for (int i = 0; i < sentences.Count; i++)
         {
             string s = Clean(sentences[i]);
-            if (s.Length < MinSentenceLength)
+            if (s.Length < MinSentenceLength || IsTableLike(s))
             {
                 continue;
             }
@@ -222,6 +321,11 @@ public sealed class SimpleTextAnalyzer : IThemeAnalyzer
             if (kwScore == 0)
             {
                 continue;
+            }
+            // Отдаём предпочтение предложениям с главным словом темы.
+            if (words.Any(w => string.Equals(w, leadWord, StringComparison.OrdinalIgnoreCase)))
+            {
+                kwScore += 2;
             }
             // Небольшая надбавка за близость к началу документа.
             double position = 1.0 + 0.3 * Math.Exp(-3.0 * ((double)i / Math.Max(1, sentences.Count)));
