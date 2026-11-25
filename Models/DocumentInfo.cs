@@ -24,6 +24,9 @@ public sealed class DocumentInfo
     /// <summary>Статус обработки.</summary>
     public DocumentStatus Status { get; set; } = DocumentStatus.Queued;
 
+    /// <summary>Текст ошибки распознавания (для диагностики), либо null.</summary>
+    public string? Error { get; set; }
+
     /// <summary>Отображаемый текст статуса.</summary>
     public string StatusText => Status switch
     {

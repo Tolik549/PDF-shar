@@ -76,56 +76,89 @@ public sealed class OcrService
     {
         if (!HasLanguageData)
         {
+            AppLog.Info("OCR пропущен: нет tessdata в " + _tessDataPath);
             return string.Empty;
         }
 
         var result = new StringBuilder();
-        using var engine = new TesseractEngine(_tessDataPath, "eng+rus", EngineMode.Default);
-
-        // Рендер страниц PDF в растровое изображение.
-        using var docReader = DocLib.Instance.GetDocReader(
-            pdfPath,
-            new PageDimensions(1080, 1920));
-
-        var pageCount = docReader.GetPageCount();
-        for (int i = 0; i < pageCount; i++)
+        TesseractEngine? engine = null;
+        try
         {
-            byte[]? raw;
-            int width;
-            int height;
+            engine = new TesseractEngine(_tessDataPath, "eng+rus", EngineMode.Default);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"Ошибка инициализации Tesseract (tessdata={_tessDataPath})", ex);
+            throw;
+        }
 
+        using (engine)
+        {
+            Docnet.Core.Readers.IDocReader? docReader = null;
             try
             {
-                using (var pageReader = docReader.GetPageReader(i))
+                docReader = DocLib.Instance.GetDocReader(
+                    pdfPath,
+                    new Docnet.Core.Models.PageDimensions(1080, 1920));
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error($"Ошибка открытия PDF для рендера '{pdfPath}'", ex);
+                throw;
+            }
+
+            using (docReader)
+            {
+                var pageCount = docReader.GetPageCount();
+                for (int i = 0; i < pageCount; i++)
                 {
-                    raw = pageReader.GetImage();
-                    width = pageReader.GetPageWidth();
-                    height = pageReader.GetPageHeight();
+                    try
+                    {
+                        string? pageText = ProcessPage(engine, docReader, i, pdfPath);
+                        if (!string.IsNullOrWhiteSpace(pageText))
+                        {
+                            result.Append(pageText);
+                            result.AppendLine();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Пропускаем сбойную страницу, продолжаем остальные.
+                        AppLog.Error($"Ошибка OCR страницы {i} документа '{pdfPath}'", ex);
+                    }
                 }
-            }
-            catch
-            {
-                // Последняя "нулевая" страница PDFium или сбой рендера — пропускаем.
-                continue;
-            }
-
-            if (raw is null || raw.Length == 0 || width <= 0 || height <= 0)
-            {
-                continue;
-            }
-
-            using var bmp = CreateBitmap(raw, width, height);
-            using var pix = PixConverter.ToPix(bmp);
-            using var page = engine.Process(pix);
-            var text = page.GetText();
-            if (!string.IsNullOrWhiteSpace(text))
-            {
-                result.Append(text);
-                result.AppendLine();
             }
         }
 
         return result.ToString();
+    }
+
+    private static string? ProcessPage(
+        TesseractEngine engine,
+        Docnet.Core.Readers.IDocReader docReader,
+        int index,
+        string pdfPath)
+    {
+        byte[]? raw;
+        int width;
+        int height;
+        using (var pageReader = docReader.GetPageReader(index))
+        {
+            raw = pageReader.GetImage();
+            width = pageReader.GetPageWidth();
+            height = pageReader.GetPageHeight();
+        }
+
+        if (raw is null || raw.Length == 0 || width <= 0 || height <= 0)
+        {
+            return null;
+        }
+
+        using var bmp = CreateBitmap(raw, width, height);
+        using var pix = PixConverter.ToPix(bmp);
+        using var page = engine.Process(pix);
+        var text = page.GetText();
+        return string.IsNullOrWhiteSpace(text) ? null : text;
     }
 
     private static Bitmap CreateBitmap(byte[] bgra, int width, int height)

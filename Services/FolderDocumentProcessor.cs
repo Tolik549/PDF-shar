@@ -119,12 +119,25 @@ public sealed class FolderDocumentProcessor : IDisposable
             doc.Summary = analysis.Summary;
             doc.Status = DocumentStatus.Ready;
         }
-        catch
+        catch (Exception ex)
         {
             doc.Status = DocumentStatus.Error;
+            doc.Error = Flatten(ex);
+            AppLog.Error($"Ошибка при обработке '{doc.FileName}'", ex);
         }
 
         return doc;
+    }
+
+    /// <summary>Читаемая цепочка сообщений исключения (с учётом InnerException).</summary>
+    private static string Flatten(Exception ex)
+    {
+        var parts = new List<string>();
+        for (Exception? e = ex; e is not null; e = e.InnerException)
+        {
+            parts.Add(e.Message);
+        }
+        return string.Join(" | ", parts);
     }
 
     public void Dispose()

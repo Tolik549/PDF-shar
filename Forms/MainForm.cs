@@ -23,6 +23,8 @@ public sealed class MainForm : Form
     private Button _browseButton = null!;
     private Button _refreshButton = null!;
     private Button _openButton = null!;
+    private Button _showErrorButton = null!;
+    private Button _logButton = null!;
     private DataGridView _grid = null!;
     private ToolStripStatusLabel _statusLabel = null!;
 
@@ -62,16 +64,22 @@ public sealed class MainForm : Form
         _browseButton = new Button { Text = "Выбрать...", AutoSize = true };
         _refreshButton = new Button { Text = "Обновить", AutoSize = true };
         _openButton = new Button { Text = "Открыть", AutoSize = true };
+        _showErrorButton = new Button { Text = "Показать ошибку", AutoSize = true };
+        _logButton = new Button { Text = "Лог", AutoSize = true };
 
         _browseButton.Click += (_, _) => BrowseFolder();
         _refreshButton.Click += (_, _) => BeginRefresh();
         _openButton.Click += (_, _) => OpenSelected();
+        _showErrorButton.Click += (_, _) => ShowSelectedError();
+        _logButton.Click += (_, _) => OpenLog();
 
         topPanel.Controls.Add(new Label { Text = "Папка:", AutoSize = true, Anchor = AnchorStyles.Left });
         topPanel.Controls.Add(_folderBox);
         topPanel.Controls.Add(_browseButton);
         topPanel.Controls.Add(_refreshButton);
         topPanel.Controls.Add(_openButton);
+        topPanel.Controls.Add(_showErrorButton);
+        topPanel.Controls.Add(_logButton);
 
         // ---- Таблица ----
         _grid = new DataGridView
@@ -89,6 +97,7 @@ public sealed class MainForm : Form
         _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(DocumentInfo.Theme), HeaderText = "Тема", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 25 });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(DocumentInfo.Summary), HeaderText = "Краткое содержание", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 60 });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(DocumentInfo.StatusText), HeaderText = "Статус", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 12 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(DocumentInfo.Error), HeaderText = "Ошибка", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 30 });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(DocumentInfo.Modified), HeaderText = "Изменено", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 14 });
         _grid.CellDoubleClick += (_, _) => OpenSelected();
 
@@ -257,6 +266,46 @@ private async void BeginRefresh()
                 Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
+
+    private void ShowSelectedError()
+    {
+        if (_grid.SelectedRows.Count == 0)
+        {
+            return;
+        }
+        if (_grid.SelectedRows[0].DataBoundItem is not DocumentInfo doc)
+        {
+            return;
+        }
+
+        string text = string.IsNullOrEmpty(doc.Error)
+            ? "Ошибок распознавания для этого документа нет."
+            : doc.Error;
+
+        MessageBox.Show(this, text,
+            "Диагностика: " + (string.IsNullOrEmpty(doc.Error) ? doc.FileName : doc.FileName),
+            MessageBoxButtons.OK,
+            string.IsNullOrEmpty(doc.Error) ? MessageBoxIcon.Information : MessageBoxIcon.Error);
+    }
+
+    private void OpenLog()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = Services.AppLog.LogFilePath,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                "Не удалось открыть лог.\nФайл: " + Services.AppLog.LogFilePath + "\n\n" + ex.Message,
+                Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
 private static string? ReadSetting(string name)
     {
         try
