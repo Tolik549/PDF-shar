@@ -15,10 +15,13 @@
   </PropertyGroup>
 
   <!-- Scanner + OCR библиотеки.
-       Внимание: в доступном NuGet-фиде для PdfPig доступна только pre-release
-       сборка 0.1.9-alpha001-patch1 (стабильная API версии 0.1.x). -->
+       ВАЖНО: в доступном NuGet-фиде для PdfPig есть только сборки
+       '0.1.9-alpha001-patch1' и '1.7.0-custom-5'. Под-пакеты (PdfPig.Core, Fonts,
+       Tokens) в фиде есть только версии '1.7.0-custom-5', поэтому используем именно
+       её для главного пакета — иначе версии внутри рассогласованы и PdfPig падает
+       при открытии документа (FileNotFoundException). -->
   <ItemGroup>
-    <PackageReference Include="UglyToad.PdfPig" Version="0.1.9-alpha001-patch1" />
+    <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
     <PackageReference Include="Docnet.Core" Version="2.6.0" />
     <PackageReference Include="Tesseract" Version="5.2.0" />
     <PackageReference Include="Tesseract.Drawing" Version="5.2.0" />

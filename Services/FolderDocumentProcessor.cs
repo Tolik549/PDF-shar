@@ -92,7 +92,18 @@ public sealed class FolderDocumentProcessor : IDisposable
             }
 
             // 1. Сначала пробуем готовый текстовый слой PDF.
-            string text = _textExtractor.ExtractText(path);
+            string text = string.Empty;
+            bool textLayerFailed = false;
+            try
+            {
+                text = _textExtractor.ExtractText(path);
+            }
+            catch (Exception textEx)
+            {
+                // Скан или PDF, который PdfPig не смог разобрать, — пробуем OCR.
+                textLayerFailed = true;
+                AppLog.Error($"Текстовый слой недоступен для '{doc.FileName}'; пробуем OCR", textEx);
+            }
 
             // 2. Если текста нет — это скан, подключаем OCR.
             if (string.IsNullOrWhiteSpace(text))
@@ -100,6 +111,9 @@ public sealed class FolderDocumentProcessor : IDisposable
                 if (!_ocr.HasLanguageData)
                 {
                     doc.Status = DocumentStatus.OcrDataMissing;
+                    doc.Error = textLayerFailed
+                        ? "Не удалось открыть PDF и нет данных OCR (tessdata)"
+                        : null;
                     return doc;
                 }
 
