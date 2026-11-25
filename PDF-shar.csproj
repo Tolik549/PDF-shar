@@ -24,4 +24,10 @@
     <PackageReference Include="Tesseract.Drawing" Version="5.2.0" />
   </ItemGroup>
 
+<!-- Рекурсивно включаем все .cs в проект (SDK-style) и встраиваем языковые данные OCR. -->
+  <ItemGroup>
+    <EmbeddedResource Include="tessdata/eng.traineddata" LogicalName="PdfShark.tessdata.eng.traineddata" />
+    <EmbeddedResource Include="tessdata/rus.traineddata" LogicalName="PdfShark.tessdata.rus.traineddata" />
+  </ItemGroup>
+
 </Project>

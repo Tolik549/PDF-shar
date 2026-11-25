@@ -27,32 +27,29 @@ dotnet build -c Release
 dotnet run -c Release
 ```
 
-### Публикация под Windows
+### Собрать self-contained EXE (для запуска на любом Windows-ПК без .NET)
 
 ```bash
-dotnet publish -c Release -r win-x64 --self-contained false
+dotnet publish -c Release -r win-x64 --self-contained true \
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+  -p:EnableCompressionInSingleFile=true -o publish/win-x64
 ```
 
-После публикации в папке вывода появится `PDF-shar.exe`.
+Результат — один файл **`publish/win-x64/PDF-shar.exe`** (~80 МБ, с встроенными
+OCR-данными). Копируется на любой Windows-ПК (10/11) и запускается без установки .NET.
 
 > Сборка возможна и из-под Linux (кросс-компиляция задаётся через
 > `EnableWindowsTargeting` в `PDF-shar.csproj`), но приложение рассчитано на запуск
 > только в Windows.
 
-## Подготовка данных OCR (важно!)
+## Данные OCR
 
-Для распознавания сканов приложению нужны языковые данные Tesseract. Положите
-папку **`tessdata`** рядом с `PDF-shar.exe`, содержащую:
+Языковые данные Tesseract (**eng + rus**, `tessdata_fast`) **встроены прямо в EXE** —
+дополнительно ничего скачивать и класть рядом не нужно. При первом запуске они
+автоматически извлекаются в `%LocalAppData%\PdfShark\tessdata`.
 
-- `eng.traineddata`
-- `rus.traineddata`
-
-Скачать можно из репозитория
-[tesseract-ocr/tessdata_fast](https://github.com/tesseract-ocr/tessdata_fast)
-(например, https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata).
-
-Если данных OCR нет, документы с текстовым слоем обрабатываются, а сканы получат
-статус «Нет данных OCR».
+> Если рядом с `PDF-shar.exe` всё же положить собственную папку `tessdata`
+> (с `eng.traineddata` и `rus.traineddata`), приложение будет использовать её.
 
 ## Требования
 

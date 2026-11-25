@@ -21,10 +21,51 @@ public sealed class OcrService
 
     public OcrService()
     {
-        _tessDataPath = Path.Combine(AppContext.BaseDirectory, "tessdata");
+        _tessDataPath = ResolveTessDataPath();
         HasLanguageData =
             File.Exists(Path.Combine(_tessDataPath, "eng.traineddata")) &&
             File.Exists(Path.Combine(_tessDataPath, "rus.traineddata"));
+    }
+
+    /// <summary>
+    /// Определяет каталог с языковыми данными. Сначала ищет папку tessdata рядом
+    /// с приложением, иначе извлекает встроенные ресурсы eng/rus в %LocalAppData%.
+    /// </summary>
+    private static string ResolveTessDataPath()
+    {
+        string localDir = Path.Combine(AppContext.BaseDirectory, "tessdata");
+        if (File.Exists(Path.Combine(localDir, "eng.traineddata")) &&
+            File.Exists(Path.Combine(localDir, "rus.traineddata")))
+        {
+            return localDir;
+        }
+
+        string targetDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "PdfShark", "tessdata");
+        Directory.CreateDirectory(targetDir);
+        ExtractIfMissing("PdfShark.tessdata.eng.traineddata", Path.Combine(targetDir, "eng.traineddata"));
+        ExtractIfMissing("PdfShark.tessdata.rus.traineddata", Path.Combine(targetDir, "rus.traineddata"));
+        return targetDir;
+    }
+
+    private static void ExtractIfMissing(string resourceName, string destFile)
+    {
+        if (File.Exists(destFile))
+        {
+            return;
+        }
+
+        using var stream = typeof(OcrService).Assembly.GetManifestResourceStream(resourceName);
+        if (stream is null)
+        {
+            return;
+        }
+
+        using (var file = File.Create(destFile))
+        {
+            stream.CopyTo(file);
+        }
     }
 
     /// <summary>Путь к каталогу с языковыми данными OCR.</summary>
