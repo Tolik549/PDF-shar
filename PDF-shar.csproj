@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>PdfShark</RootNamespace>
+    <AssemblyName>PDF-shar</AssemblyName>
+    <Version>1.0.0</Version>
+    <!-- WinForms приложение распространяется только для Windows,
+         но сборка/публикация артефактов может выполняться и на Linux. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <!-- Scanner + OCR библиотеки.
+       Внимание: в доступном NuGet-фиде для PdfPig доступна только pre-release
+       сборка 0.1.9-alpha001-patch1 (стабильная API версии 0.1.x). -->
+  <ItemGroup>
+    <PackageReference Include="UglyToad.PdfPig" Version="0.1.9-alpha001-patch1" />
+    <PackageReference Include="Docnet.Core" Version="2.6.0" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
+    <PackageReference Include="Tesseract.Drawing" Version="5.2.0" />
+  </ItemGroup>
+
+</Project>
