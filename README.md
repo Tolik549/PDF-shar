@@ -27,16 +27,23 @@ dotnet build -c Release
 dotnet run -c Release
 ```
 
-### Собрать self-contained EXE (для запуска на любом Windows-ПК без .NET)
+### Собрать self-contained версию (для запуска на любом Windows-ПК без .NET)
+
+> ⚠️ **Не публикуйте в один файл (single-file)!** Движок OCR Tesseract находит свои
+> нативные DLL по реальному пути сборки; в single-file этого пути нет и OCR падает.
+> Надёжный вариант — self-contained **папка**.
 
 ```bash
-dotnet publish -c Release -r win-x64 --self-contained true \
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
-  -p:EnableCompressionInSingleFile=true -o publish/win-x64
+# Windows:
+.\tools\publish-win.ps1
+# или Linux:
+bash tools/publish-win.sh
 ```
 
-Результат — один файл **`publish/win-x64/PDF-shar.exe`** (~80 МБ, с встроенными
-OCR-данными). Копируется на любой Windows-ПК (10/11) и запускается без установки .NET.
+Результат — архив **`publish/PDF-shar-win-x64.zip`**. Распакуйте на любом
+Windows-ПК (10/11) в любую папку и запустите **`PDF-shar.exe`** — .NET и OCR-данные
+встроены, отдельная установка не нужна. В папке рядом с exe всегда должны лежать
+нативные библиотеки: `pdfium.dll` и `x64/tesseract50.dll` (они идут в комплекте).
 
 > Сборка возможна и из-под Linux (кросс-компиляция задаётся через
 > `EnableWindowsTargeting` в `PDF-shar.csproj`), но приложение рассчитано на запуск
